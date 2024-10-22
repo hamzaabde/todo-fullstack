@@ -40,18 +40,24 @@ app.delete(
 	"/todos/:id",
 	wrap(async (req, res) => {
 		const { id } = req.params
+
 		await pool.query("DELETE FROM todos WHERE id = $1", [id])
 
-		res.status(204).end()
+		res.status(201).json({ message: "Todo deleted" })
 	})
 )
 
 app.post(
-	"/sync",
+	"/todos/sync",
 	wrap(async (req, res) => {
 		const { todos } = req.body
 
 		await pool.query("TRUNCATE todos")
+
+		if (!todos)
+			return res
+				.status(201)
+				.json({ message: "No todos to sync, but deleted all for yu!" })
 
 		for (const todo of todos) {
 			await pool.query("INSERT INTO todos (body) VALUES ($1)", [todo.body])
@@ -81,24 +87,21 @@ function main() {
 		.then(({ row }) => {
 			if (row.length === 0) {
 				console.log("Running migration")
-				pool.migrate().then(() => {
-					console.log("Migration complete")
-				})
+				migrate()
+					.then(() => {
+						console.log("Migration complete")
+					})
+					.catch((err) => {
+						console.error(err)
+						process.exit(1)
+					})
 			}
 		})
 		.catch(() => {
 			console.log("Running migration")
-			pool.migrate().then(() => {
+			migrate().then(() => {
 				console.log("Migration complete")
 			})
-		})
-	migrate()
-		.then(() => {
-			console.log("Migration complete")
-		})
-		.catch((err) => {
-			console.error(err)
-			process.exit(1)
 		})
 
 	app.listen(PORT, () => {
